@@ -60,7 +60,7 @@ const app = express();
 
 // ✅ CORS for Webflow
 app.use(cors({
-  origin: 'https://www.treva.realestate',
+ origin: ['https://www.treva.realestate', 'https://treva-2025.webflow.io'],
   methods: ['POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type']
 }));
