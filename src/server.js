@@ -148,6 +148,70 @@ app.post('/api/webflow-lead', async (req, res) => {
   }
 });
 
+app.post('/api/webflow-registration', async (req, res) => {
+  const {
+    name,
+    email,
+    phone,
+    city,
+    brokerType,
+    experience,
+    website,
+    message
+  } = req.body;
+
+  console.log('📥 Registration form data:', req.body);
+
+  if (!name || !email || !phone) {
+    return res.status(400).json({
+      success: false,
+      message: 'Name, email və phone mütləqdir'
+    });
+  }
+
+  try {
+    const bitrixData = {
+      fields: {
+        TITLE: `Treva Registration - ${name}`,
+        SOURCE_ID: 'WEB',
+        COMMENTS: `
+Şəhər: ${city}
+Broker növü: ${brokerType}
+İş təcrübəsi: ${experience}
+Website: ${website}
+
+Mesaj:
+${message || ''}
+        `.trim()
+      }
+    };
+
+    bitrixData.fields.NAME = name;
+    bitrixData.fields.EMAIL = [{ VALUE: email, VALUE_TYPE: 'WORK' }];
+    bitrixData.fields.PHONE = [{ VALUE: phone, VALUE_TYPE: 'WORK' }];
+
+    const response = await axios.post(
+      `${process.env.BITRIX_WEBHOOK_URL}/crm.lead.add`,
+      bitrixData
+    );
+
+    return res.status(200).json({
+      success: true,
+      leadId: response.data.result
+    });
+
+  } catch (err) {
+    console.error('❌ Registration Bitrix error:', err.response?.data || err.message);
+    return res.status(500).json({
+      success: false,
+      message: 'Registration zamanı xəta baş verdi'
+    });
+  }
+});
+
+
+
+
 // ✅ 404 handler
 app.use((req, res) => {
   res.status(404).json({ 
