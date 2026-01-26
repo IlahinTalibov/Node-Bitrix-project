@@ -51,7 +51,6 @@
 // });
 
 // export default app; // ✅ Vercel üçün lazımdır
-
 import express from 'express';
 import axios from 'axios';
 import cors from 'cors';
@@ -59,34 +58,32 @@ import 'dotenv/config';
 
 const app = express();
 
-// ✅ CORS əlavə et
-app.use(cors());
+// ✅ CORS for Webflow
+app.use(cors({
+  origin: 'https://www.treva.realestate',
+  methods: ['POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type']
+}));
+
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// ✅ Health check
-app.get('/', (req, res) => {
-  res.json({ status: 'OK', message: 'Server işləyir' });
-});
+// Health check
+app.get('/', (req, res) => res.json({ status: 'OK', message: 'Server işləyir' }));
 
+// OPTIONS preflight explicitly (optional)
+app.options('/api/webflow-lead', (req, res) => res.sendStatus(200));
+
+// POST form
 app.post('/api/webflow-lead', async (req, res) => {
   const { name, email, phone, message } = req.body;
-
-  // 🔍 DEBUG - göndərilən datanı göstər
   console.log('📥 Incoming form data:', req.body);
-  console.log('📊 Parsed values:', { name, email, phone, message });
 
-  // ✅ Validation - ən azı bir field dolu olmalıdır
   if (!name && !email && !phone && !message) {
-    console.log('❌ Validation failed: All fields empty');
-    return res.status(400).json({ 
-      success: false, 
-      message: 'Ən azı bir sahə doldurulmalıdır' 
-    });
+    return res.status(400).json({ success: false, message: 'Ən azı bir sahə doldurulmalıdır' });
   }
 
   try {
-    // ✅ Bitrix üçün data hazırlayırıq
     const bitrixData = {
       fields: {
         TITLE: `Treva Website Contact - ${name || email || 'Anonim'}`,
@@ -95,134 +92,28 @@ app.post('/api/webflow-lead', async (req, res) => {
       }
     };
 
-    // ✅ Yalnız dolu fieldləri əlavə et
-    if (name && name.trim()) {
-      bitrixData.fields.NAME = name.trim();
-    }
-
-    if (email && email.trim()) {
-      bitrixData.fields.EMAIL = [{ VALUE: email.trim(), VALUE_TYPE: 'WORK' }];
-    }
-
-    if (phone && phone.trim()) {
-      bitrixData.fields.PHONE = [{ VALUE: phone.trim(), VALUE_TYPE: 'WORK' }];
-    }
-
-    console.log('📤 Sending to Bitrix:', JSON.stringify(bitrixData, null, 2));
+    if (name) bitrixData.fields.NAME = name.trim();
+    if (email) bitrixData.fields.EMAIL = [{ VALUE: email.trim(), VALUE_TYPE: 'WORK' }];
+    if (phone) bitrixData.fields.PHONE = [{ VALUE: phone.trim(), VALUE_TYPE: 'WORK' }];
 
     const response = await axios.post(
       `${process.env.BITRIX_WEBHOOK_URL}/crm.lead.add`,
       bitrixData,
-      {
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        timeout: 10000 // 10 saniyə timeout
-      }
+      { headers: { 'Content-Type': 'application/json' }, timeout: 10000 }
     );
 
-    console.log('✅ Bitrix success:', response.data);
-    
-    // ✅ Uğurlu response
-    res.status(200).json({ 
-      success: true, 
-      message: 'Lead uğurla yaradıldı',
-      leadId: response.data.result 
-    });
+    res.status(200).json({ success: true, message: 'Lead yaradıldı', leadId: response.data.result });
 
   } catch (err) {
-    // ✅ Detallı error logging
-    console.error('❌ Bitrix error:', {
-      message: err.message,
-      response: err.response?.data,
-      status: err.response?.status,
-      config: err.config?.url
-    });
-
-    // ✅ User-friendly error response
-    res.status(500).json({ 
-      success: false, 
-      message: 'Xəta baş verdi. Zəhmət olmasa yenidən cəhd edin.',
-      error: process.env.NODE_ENV === 'development' ? err.message : undefined
-    });
+    console.error('❌ Bitrix error:', err.response?.data || err.message);
+    res.status(500).json({ success: false, message: 'Xəta baş verdi' });
   }
 });
 
-app.post('/api/webflow-registration', async (req, res) => {
-  const {
-    name,
-    email,
-    phone,
-    city,
-    brokerType,
-    experience,
-    website,
-    message
-  } = req.body;
-
-  console.log('📥 Registration form data:', req.body);
-
-  if (!name || !email || !phone) {
-    return res.status(400).json({
-      success: false,
-      message: 'Name, email və phone mütləqdir'
-    });
-  }
-
-  try {
-    const bitrixData = {
-      fields: {
-        TITLE: `Treva Registration - ${name}`,
-        SOURCE_ID: 'WEB',
-        COMMENTS: `
-Şəhər: ${city}
-Broker növü: ${brokerType}
-İş təcrübəsi: ${experience}
-Website: ${website}
-
-Mesaj:
-${message || ''}
-        `.trim()
-      }
-    };
-
-    bitrixData.fields.NAME = name;
-    bitrixData.fields.EMAIL = [{ VALUE: email, VALUE_TYPE: 'WORK' }];
-    bitrixData.fields.PHONE = [{ VALUE: phone, VALUE_TYPE: 'WORK' }];
-
-    const response = await axios.post(
-      `${process.env.BITRIX_WEBHOOK_URL}/crm.lead.add`,
-      bitrixData
-    );
-
-    return res.status(200).json({
-      success: true,
-      leadId: response.data.result
-    });
-
-  } catch (err) {
-    console.error('❌ Registration Bitrix error:', err.response?.data || err.message);
-    return res.status(500).json({
-      success: false,
-      message: 'Registration zamanı xəta baş verdi'
-    });
-  }
-});
-
-
-
-
-// ✅ 404 handler
-app.use((req, res) => {
-  res.status(404).json({ 
-    success: false, 
-    message: 'Endpoint tapılmadı' 
-  });
-});
+// 404 handler
+app.use((req, res) => res.status(404).json({ success: false, message: 'Endpoint tapılmadı' }));
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`🚀 Server running on port ${PORT}`);
-});
+app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
 
-export default app; 
+export default app;
