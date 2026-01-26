@@ -110,6 +110,37 @@ app.post('/api/webflow-lead', async (req, res) => {
   }
 });
 
+app.post('/api/webflow-registration', async (req, res) => {
+  const { name, email, phone, city } = req.body;
+
+  if (!name || !email || !phone) {
+    return res.status(400).json({ success: false, message: 'Name, email və phone mütləqdir' });
+  }
+
+  try {
+    // Bitrix-ə göndərmə
+    const bitrixData = {
+      fields: {
+        TITLE: `Treva Registration - ${name}`,
+        NAME: name,
+        EMAIL: [{ VALUE: email, VALUE_TYPE: 'WORK' }],
+        PHONE: [{ VALUE: phone, VALUE_TYPE: 'WORK' }],
+        COMMENTS: `Şəhər: ${city || ''}`,
+        SOURCE_ID: 'WEB'
+      }
+    };
+
+    const response = await axios.post(`${process.env.BITRIX_WEBHOOK_URL}/crm.lead.add`, bitrixData);
+
+    res.status(200).json({ success: true, leadId: response.data.result });
+
+  } catch (err) {
+    console.error('❌ Registration Bitrix error:', err.response?.data || err.message);
+    res.status(500).json({ success: false, message: 'Xəta baş verdi' });
+  }
+});
+
+
 // 404 handler
 app.use((req, res) => res.status(404).json({ success: false, message: 'Endpoint tapılmadı' }));
 
