@@ -207,7 +207,7 @@ app.post('/api/webflow-registration', async (req, res) => {
   try {
     const bitrixData = {
       fields: {
-        TITLE: `Treva Registration - ${name}`,
+        TITLE: `TREVA Brokers Form - ${name}`,
         NAME: name,
         EMAIL: [{ VALUE: email, VALUE_TYPE: 'WORK' }],
         PHONE: [{ VALUE: phone, VALUE_TYPE: 'WORK' }],
