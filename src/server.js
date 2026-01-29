@@ -60,7 +60,7 @@ const app = express();
 
 // ✅ CORS for Webflow
 app.use(cors({
- origin: ['https://www.treva.realestate', 'https://treva-2025.webflow.io', 'https://arabian-ranches.webflow.io', 'https://arabian-ranches.design.webflow.com'],
+ origin: ['https://www.treva.realestate', 'https://treva-2025.webflow.io', 'https://arabian-ranches.webflow.io', 'https://arabian-ranches.design.webflow.com', "https://www.marinavillage"],
   methods: ['POST', 'OPTIONS'],
   allowedHeaders: ['Content-Type']
 }));
@@ -159,6 +159,7 @@ app.get('/', (req, res) => res.json({ status: 'OK', message: 'Server işləyir' 
 app.options('/api/webflow-lead', (req, res) => res.sendStatus(200));
 app.options('/api/webflow-registration', (req, res) => res.sendStatus(200));
 app.options('/api/webflow-broker', (req, res) => res.sendStatus(200));
+app.options('/api/webflow-marinacontact', (req, res) => res.sendStatus(200));
 
 // POST form - Original contact form
 app.post('/api/webflow-lead', async (req, res) => {
@@ -263,6 +264,43 @@ app.post('/api/webflow-broker', async (req, res) => {
   } catch (err) {
     console.error('❌ Broker Bitrix error:', err.response?.data || err.message);
     res.status(500).json({ success: false, message: 'Xəta baş verdi' });
+  }
+});
+
+app.post('/api/webflow-marinacontact', async (req, res) => {
+  const { name, email, message } = req.body;
+
+  if (!name && !email && !message) {
+    return res.status(400).json({
+      success: false,
+      message: 'Boş sorğu'
+    });
+  }
+
+  try {
+    const bitrixPayload = {
+      fields: {
+        TITLE: `Marina Webflow Sorğu - ${name || email || 'Anonim'}`,
+        NAME: name || '',
+        EMAIL: email ? [{ VALUE: email, VALUE_TYPE: 'WORK' }] : [],
+        COMMENTS: message || '',
+        SOURCE_ID: 'WEB'
+      }
+    };
+
+    const response = await axios.post(
+     `${process.env.BITRIX_WEBHOOK_URL}/crm.lead.add`,
+      bitrixPayload
+    );
+
+    res.json({
+      success: true,
+      leadId: response.data.result
+    });
+
+  } catch (err) {
+    console.error('❌ Bitrix error:', err.response?.data || err.message);
+    res.status(500).json({ success: false });
   }
 });
 
